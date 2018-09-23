@@ -1,2 +1,1 @@
-import { IOptions } from './options';
-export default function extractHostname(url: string, options: IOptions): string | null;
+export default function extractHostname(url: string): string | null;

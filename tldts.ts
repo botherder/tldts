@@ -37,6 +37,8 @@ interface IResult {
 // extract the domain and subdomain if we are only interested in public suffix).
 const enum FLAG {
   HOST,
+  IS_VALID,
+  IS_IP,
   PUBLIC_SUFFIX,
   DOMAIN,
   SUB_DOMAIN,
@@ -58,14 +60,15 @@ function parseImplFactory(trie: Trie = getRules()) {
       subdomain: null,
     };
 
-    const host = options.extractHostname(url, options);
+    // Extract hostname from `url`
+    const host = options.extractHostname(url);
     if (host === null) {
       result.isIp = false;
       result.isValid = false;
       return result;
     }
-
     result.host = host.toLowerCase();
+    if (step === FLAG.HOST) { return result; }
 
     // Check if `host` is a valid ip address
     result.isIp = isIpImpl(result.host);
@@ -73,11 +76,11 @@ function parseImplFactory(trie: Trie = getRules()) {
       result.isValid = true;
       return result;
     }
+    if (step === FLAG.IS_IP) { return result; }
 
     // Check if `host` is valid
     result.isValid = isValidHostnameImpl(result.host, options);
-    if (result.isValid === false) { return result; }
-    if (step === FLAG.HOST) { return result; }
+    if (result.isValid === false || step === FLAG.IS_VALID) { return result; }
 
     // Extract public suffix
     const publicSuffixResult = getPublicSuffixImpl(

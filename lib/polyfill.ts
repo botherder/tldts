@@ -13,3 +13,22 @@ export function startsWith(str: string, prefix: string): boolean {
 
   return true;
 }
+
+export function startsWithFrom(
+  haystack: string,
+  needle: string,
+  start: number,
+): boolean {
+  if (haystack.length - start < needle.length) {
+    return false;
+  }
+
+  const ceil = start + needle.length;
+  for (let i = start; i < ceil; i += 1) {
+    if (haystack[i] !== needle[i - start]) {
+      return false;
+    }
+  }
+
+  return true;
+}

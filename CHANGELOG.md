@@ -1,7 +1,10 @@
 ## Change Log
 
 ### *not released*
+
+- [#3](https://github.com/remusao/tldts/pull/3) Make getHostname more efficient
 - [#2](https://github.com/remusao/tldts/pull/2) Fix isPrivate being undefined
+- [#4](https://github.com/remusao/tldts/pull/4) Optimize the implementation of options' setDefaults
 
 ### 3.0.2 (2018/10/03 15h46)
 

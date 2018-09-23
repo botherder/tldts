@@ -244,8 +244,28 @@ describe('tld.js', () => {
   });
 
   describe('#getHostname', () => {
+    it('handles space only inputs', () => {
+      expect(tld.getHostname(' ')).toEqual('');
+      expect(tld.getHostname('  ')).toEqual('');
+    });
+
+    it('handles space corner-cases', () => {
+      expect(tld.getHostname(' a')).toEqual('a');
+      expect(tld.getHostname('a ')).toEqual('a');
+      expect(tld.getHostname(' a ')).toEqual('a');
+      expect(tld.getHostname(' a  ')).toEqual('a');
+    });
+
     it('should return a valid hostname as is', () => {
       expect(tld.getHostname(' example.CO.uk ')).toEqual('example.co.uk');
+      expect(tld.getHostname('  example.CO.uk ')).toEqual('example.co.uk');
+      expect(tld.getHostname('  example.CO.uk  ')).toEqual('example.co.uk');
+    });
+
+    it('should strip trailing dots', () => {
+      expect(tld.getHostname('example.co.uk.')).toEqual('example.co.uk');
+      expect(tld.getHostname('example.co.uk..')).toEqual('example.co.uk');
+      expect(tld.getHostname('example.co.uk...')).toEqual('example.co.uk');
     });
 
     it('should return the hostname of a scheme-less URL', () => {
@@ -274,10 +294,12 @@ describe('tld.js', () => {
 
     it('should return the hostname of a user-password same-scheme URL', () => {
       expect(tld.getHostname('//user:password@example.co.uk:8080/some/path?and&query#hash')).toEqual('example.co.uk');
+      expect(tld.getHostname('  //user:password@example.co.uk:8080/some/path?and&query#hash')).toEqual('example.co.uk');
     });
 
     it('should return the hostname of a passwordless same-scheme URL', () => {
       expect(tld.getHostname('//user@example.co.uk:8080/some/path?and&query#hash')).toEqual('example.co.uk');
+      expect(tld.getHostname('  //user@example.co.uk:8080/some/path?and&query#hash')).toEqual('example.co.uk');
     });
 
     it('should return the hostname of a complex user-password scheme URL', () => {
@@ -287,10 +309,6 @@ describe('tld.js', () => {
     it('should return the hostname of a complex passwordless scheme URL', () => {
       expect(tld.getHostname('git+ssh://user@example.co.uk:8080/some/path?and&query#hash')).toEqual('example.co.uk');
     });
-
-    // it('should return the initial value if it is not a valid hostname', () => {
-    //   expect(tld.getHostname(42)).toEqual('42');
-    // });
 
     it('should return www.nytimes.com even with an URL as a parameter', () => {
       expect(tld.getHostname('http://www.nytimes.com/glogin?URI=http://www.notnytimes.com/2010/03/26/us/politics/26court.html&OQ=_rQ3D1Q26&OP=45263736Q2FKgi!KQ7Dr!K@@@Ko!fQ24KJg(Q3FQ5Cgg!Q60KQ60W.WKWQ22KQ60IKyQ3FKigQ24Q26!Q26(Q3FKQ60I(gyQ5C!Q2Ao!fQ24')).toEqual('www.nytimes.com');

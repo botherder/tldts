@@ -128,6 +128,18 @@ function startsWith(str, prefix) {
     }
     return true;
 }
+function startsWithFrom(haystack, needle, start) {
+    if (haystack.length - start < needle.length) {
+        return false;
+    }
+    var ceil = start + needle.length;
+    for (var i = start; i < ceil; i += 1) {
+        if (haystack[i] !== needle[i - start]) {
+            return false;
+        }
+    }
+    return true;
+}
 
 function longestMatch(a, b) {
     if (a.index === -1) {
@@ -418,77 +430,68 @@ function isValid(hostname, options) {
     return (isValidHostname(hostname) && (options.strictHostnameValidation === false || !containsUnderscore(hostname)));
 }
 
-function trimTrailingDots(value) {
-    if (value[value.length - 1] === '.') {
-        return value.slice(0, value.length - 1);
-    }
-    return value;
-}
-function isTrimmingNeeded(value) {
-    return (value.length > 0 && (value.charCodeAt(0) <= 32 ||
-        value.charCodeAt(value.length - 1) <= 32));
-}
-function isSchemeChar(code) {
-    var lowerCaseCode = code | 32;
-    return ((lowerCaseCode >= 97 && lowerCaseCode <= 122) ||
-        (lowerCaseCode >= 48 && lowerCaseCode <= 57) ||
-        lowerCaseCode === 46 ||
-        lowerCaseCode === 45 ||
-        lowerCaseCode === 43);
-}
-function extractHostname(url, options) {
-    if (isTrimmingNeeded(url)) {
-        url = url.trim();
-    }
-    if (isValid(url, options)) {
-        return trimTrailingDots(url);
-    }
+function extractHostname(url) {
     var start = 0;
     var end = url.length;
-    if (startsWith(url, '//')) {
-        start = 2;
+    for (; start < url.length && url.charCodeAt(start) <= 32; start += 1) { }
+    for (; end > (start + 1) && url.charCodeAt(end - 1) <= 32; end -= 1) { }
+    if (startsWithFrom(url, '//', start)) {
+        start += 2;
     }
     else {
-        var indexOfProtocol = url.indexOf('://');
+        var indexOfProtocol = url.indexOf('://', start);
         if (indexOfProtocol !== -1) {
             start = indexOfProtocol + 3;
             for (var i = 0; i < indexOfProtocol; i += 1) {
-                if (!isSchemeChar(url.charCodeAt(i))) {
+                var lowerCaseCode = url.charCodeAt(i) | 32;
+                if (!((lowerCaseCode >= 97 && lowerCaseCode <= 122) ||
+                    (lowerCaseCode >= 48 && lowerCaseCode <= 57) ||
+                    lowerCaseCode === 46 ||
+                    lowerCaseCode === 45 ||
+                    lowerCaseCode === 43)) {
                     return null;
                 }
             }
         }
     }
-    var indexOfSlash = url.indexOf('/', start);
-    if (indexOfSlash !== -1) {
-        end = indexOfSlash;
+    var indexOfIdentifier = -1;
+    var indexOfClosingBracket = -1;
+    var indexOfPort = -1;
+    for (var i = start; i < end; i += 1) {
+        var code = url.charCodeAt(i);
+        if (code === 35 ||
+            code === 47 ||
+            code === 63) {
+            end = i;
+            break;
+        }
+        else if (code === 64) {
+            indexOfIdentifier = i;
+        }
+        else if (code === 93) {
+            indexOfClosingBracket = i;
+        }
+        else if (code === 58) {
+            indexOfPort = i;
+        }
     }
-    var indexOfParams = url.indexOf('?', start);
-    if (indexOfParams !== -1 && indexOfParams < end) {
-        end = indexOfParams;
-    }
-    var indexOfFragments = url.indexOf('#', start);
-    if (indexOfFragments !== -1 && indexOfFragments < end) {
-        end = indexOfFragments;
-    }
-    var indexOfIdentifier = url.indexOf('@', start);
-    if (indexOfIdentifier !== -1 && indexOfIdentifier < end) {
+    if (indexOfIdentifier !== -1 && indexOfIdentifier > start && indexOfIdentifier < end) {
         start = indexOfIdentifier + 1;
     }
-    if (url.charAt(start) === '[') {
-        var indexOfClosingBracket = url.indexOf(']', start);
+    if (url.charCodeAt(start) === 91) {
         if (indexOfClosingBracket !== -1) {
             return url.slice(start + 1, indexOfClosingBracket);
         }
         return null;
     }
-    else {
-        var indexOfPort = url.indexOf(':', start);
-        if (indexOfPort !== -1 && indexOfPort < end) {
-            end = indexOfPort;
-        }
+    else if (indexOfPort !== -1 && indexOfPort > start && indexOfPort < end) {
+        end = indexOfPort;
     }
-    return trimTrailingDots(url.slice(start, end));
+    for (; end > (start + 1) && url.charCodeAt(end - 1) === 46; end -= 1) { }
+    if (start !== 0 || end !== url.length) {
+        return url.slice(start, end);
+    }
+    return url;
 }
 
 function setDefaults(_a) {
@@ -539,7 +542,7 @@ function getSubdomain(hostname, domain) {
 function parseImplFactory(trie) {
     if (trie === void 0) { trie = getRules(); }
     return function (url, partialOptions, step) {
-        if (step === void 0) { step = 4; }
+        if (step === void 0) { step = 6; }
         var options = setDefaults(partialOptions);
         var result = {
             domain: null,
@@ -551,34 +554,37 @@ function parseImplFactory(trie) {
             publicSuffix: null,
             subdomain: null
         };
-        var host = options.extractHostname(url, options);
+        var host = options.extractHostname(url);
         if (host === null) {
             result.isIp = false;
             result.isValid = false;
             return result;
         }
         result.host = host.toLowerCase();
+        if (step === 0) {
+            return result;
+        }
         result.isIp = isIp(result.host);
         if (result.isIp) {
             result.isValid = true;
             return result;
         }
-        result.isValid = isValid(result.host, options);
-        if (result.isValid === false) {
+        if (step === 2) {
             return result;
         }
-        if (step === 0) {
+        result.isValid = isValid(result.host, options);
+        if (result.isValid === false || step === 1) {
             return result;
         }
         var publicSuffixResult = getPublicSuffix(trie, result.host, options);
         result.publicSuffix = publicSuffixResult.publicSuffix;
         result.isIcann = publicSuffixResult.isIcann;
         result.isPrivate = publicSuffixResult.isIcann === false;
-        if (step === 1) {
+        if (step === 3) {
             return result;
         }
         result.domain = getDomain(result.publicSuffix, result.host, options);
-        if (step === 2) {
+        if (step === 4) {
             return result;
         }
         result.subdomain = getSubdomain(result.host, result.domain);
@@ -599,13 +605,13 @@ function isValidHostname$1(url, options) {
     return isValid(url, setDefaults(options));
 }
 function getPublicSuffix$1(url, options) {
-    return parseImpl(url, options, 1).publicSuffix;
+    return parseImpl(url, options, 3).publicSuffix;
 }
 function getDomain$1(url, options) {
-    return parseImpl(url, options, 2).domain;
+    return parseImpl(url, options, 4).domain;
 }
 function getSubdomain$1(url, options) {
-    return parseImpl(url, options, 3).subdomain;
+    return parseImpl(url, options, 5).subdomain;
 }
 function getHostname(url, options) {
     return parseImpl(url, options, 0).host;
